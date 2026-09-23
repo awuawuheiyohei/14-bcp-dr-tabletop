@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BCP DR Tabletop Exercise and Resilience</title>
+<style>
+:root {
+  --bg: #0f1419; --panel: #1a2028; --panel2: #232a36; --border: #2f3845;
+  --text: #e6edf3; --text-dim: #8b949e; --accent: #58a6ff;
+  --green: #3fb950; --yellow: #d29922; --orange: #f0883e; --red: #f85149;
+  --critical: #f85149; --high: #f0883e; --medium: #d29922; --low: #3fb950;
+  --tier0: #f85149; --tier1: #f0883e; --tier2: #8b949e;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.55; }
+.topbar { background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+  padding: 16px 32px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center; }
+.topbar h1 { font-size: 18px; font-weight: 600; }
+.topbar .meta { font-size: 12px; color: var(--text-dim); }
+.container { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; }
+.card .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.card .value { font-size: 28px; font-weight: 700; margin-top: 8px; }
+.card .sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.card.critical .value { color: var(--critical); }
+.card.warning .value { color: var(--yellow); }
+.card.success .value { color: var(--green); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+.tab { padding: 10px 18px; cursor: pointer; color: var(--text-dim); border-bottom: 2px solid transparent;
+  font-size: 13px; user-select: none; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 8px; overflow: hidden; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+th { background: var(--panel2); color: var(--text-dim); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+tr:hover { background: var(--panel2); }
+.severity { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.severity.CRITICAL { background: rgba(248,81,73,0.2); color: var(--critical); }
+.severity.HIGH     { background: rgba(240,136,62,0.2); color: var(--high); }
+.severity.MEDIUM   { background: rgba(210,153,34,0.2); color: var(--medium); }
+.severity.LOW      { background: rgba(63,185,80,0.2); color: var(--low); }
+.tier-TIER_0 { color: var(--tier0); font-weight: 700; }
+.tier-TIER_1 { color: var(--tier1); font-weight: 600; }
+.tier-TIER_2 { color: var(--tier2); }
+.status-OPEN  { color: var(--orange); }
+.status-CLOSED { color: var(--green); }
+.status-IN_PROGRESS { color: var(--yellow); }
+.status-VERIFIED { color: var(--green); }
+.btn { background: var(--accent); color: white; border: none; padding: 8px 16px; border-radius: 6px;
+  cursor: pointer; font-size: 13px; font-weight: 600; }
+.btn:hover { filter: brightness(1.15); }
+.btn.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+.btn.success { background: var(--green); }
+.btn.warning { background: var(--orange); color: white; }
+.btn.danger { background: var(--red); }
+.btn-row { display: flex; gap: 8px; }
+.section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px;
+  margin-bottom: 18px; }
+.section h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+.section h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.kv { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 13px; }
+.kv .k { color: var(--text-dim); }
+.kv .v { color: var(--text); }
+pre.code { background: var(--bg); border: 1px solid var(--border); padding: 12px; border-radius: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; overflow-x: auto;
+  white-space: pre-wrap; word-break: break-all; color: var(--text); }
+.filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.filter-row select, .filter-row input { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+  padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+.bar { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 8px; }
+.bar-fill { height: 8px; background: var(--accent); border-radius: 4px; min-width: 2px; }
+.bar-bg { flex: 1; background: var(--bg); border-radius: 4px; height: 8px; overflow: hidden; }
+.empty { padding: 30px; text-align: center; color: var(--text-dim); font-size: 13px; }
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel); border: 1px solid var(--border);
+  padding: 12px 18px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: none; z-index: 999; }
+.toast.success { border-color: var(--green); }
+.toast.error { border-color: var(--red); }
+.phase-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px 18px; margin-bottom: 12px; }
+.phase-title { font-weight: 600; margin-bottom: 6px; }
+.phase-meta { font-size: 11px; color: var(--text-dim); margin-bottom: 10px; }
+.phase-desc { font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.phase-score { display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: 700; }
+.phase-score.good { background: rgba(63,185,80,0.2); color: var(--green); }
+.phase-score.warn { background: rgba(210,153,34,0.2); color: var(--medium); }
+.phase-score.bad  { background: rgba(248,81,73,0.2); color: var(--critical); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>BCP DR Tabletop Exercise and Resilience</h1>
+    <div class="meta">v0.1 · 端口 5041 · ISO 27001 A.5.29/A.5.30 · SOC 2 A1.2/A1.3 · PIPL/GDPR/PDPA</div>
+  </div>
+  <button class="btn secondary" onclick="reseed()">↻ Reseed Demo</button>
+</div>
+
+<div class="container">
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="scorecard">Scorecard</div>
+    <div class="tab" data-tab="bia">BIA Systems</div>
+    <div class="tab" data-tab="tabletop">Tabletop</div>
+    <div class="tab" data-tab="caps">CAPs</div>
+    <div class="tab" data-tab="report">SOC 2 Report</div>
+    <div class="tab" data-tab="audit">Audit</div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Scorecard Tab                                 -->
+  <!-- ============================================ -->
+  <div class="tab-panel active" id="tab-scorecard">
+    <div class="cards" id="cards">
+      <div class="card"><div class="label">BIA Systems</div><div class="value" id="card-systems">—</div><div class="sub">across all BUs</div></div>
+      <div class="card critical"><div class="label">Tier-0 (Mission Critical)</div><div class="value" id="card-t0">—</div><div class="sub">RTO ≤ 2h, RPO = 0</div></div>
+      <div class="card warning"><div class="label">Open CAPs</div><div class="value" id="card-caps">—</div><div class="sub"><span id="card-caps-critical">—</span> CRITICAL</div></div>
+      <div class="card"><div class="label">Worst-Case 24h Loss</div><div class="value" id="card-loss">—</div><div class="sub">tier-aggregated $/hr × 24</div></div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:18px;">
+      <div class="section">
+        <h2>Tier Distribution</h2>
+        <div id="by-tier"></div>
+      </div>
+      <div class="section">
+        <h2>Business Unit Distribution</h2>
+        <div id="by-unit"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Open CAPs by Severity</h2>
+      <div id="by-cap-sev"></div>
+    </div>
+
+    <div class="section">
+      <h2>Latest Exercise</h2>
+      <div class="kv" id="ex-summary"></div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- BIA Systems Tab                               -->
+  <!-- ============================================ -->
+  <div class="tab-panel" id="tab-bia">
+    <div class="filter-row">
+      <select id="b-tier">
+        <option value="">All Tiers</option>
+        <option value="TIER_0">TIER_0 (Mission Critical)</option>
+        <option value="TIER_1">TIER_1 (Business Critical)</option>
+        <option value="TIER_2">TIER_2 (Operational)</option>
+      </select>
+      <select id="b-unit">
+        <option value="">All Business Units</option>
+      </select>
+      <select id="b-region">
+        <option value="">All Regions</option>
+        <option value="apac">APAC</option>
+        <option value="global">Global</option>
+        <option value="us">US</option>
+        <option value="emea">EMEA</option>
+      </select>
+      <button class="btn secondary" onclick="loadSystems()">Apply</button>
+    </div>
+
+    <div class="section" style="padding:0;">
+      <table>
+        <thead><tr>
+          <th>System</th><th>Business Unit</th><th>Tier</th><th>$/hr Loss</th>
+          <th>RTO / RPO</th><th>Region</th><th>Data Class</th>
+          <th>Owner</th><th>Flags</th>
+        </tr></thead>
+        <tbody id="b-tbody"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>BIA Portfolio Stats</h2>
+      <div class="kv" id="b-portfolio"></div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Tabletop Tab                                  -->
+  <!-- ============================================ -->
+  <div class="tab-panel" id="tab-tabletop">
+    <div class="section">
+      <h2>4-Phase Tabletop Scenario · 跨国勒索软件爆发</h2>
+      <div id="inject-list"></div>
+    </div>
+
+    <div class="section">
+      <h2>Exercise Scorecard</h2>
+      <div id="ex-scorecard"></div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CAPs Tab                                      -->
+  <!-- ============================================ -->
+  <div class="tab-panel" id="tab-caps">
+    <div class="filter-row">
+      <select id="c-sev">
+        <option value="">All Severities</option>
+        <option value="CRITICAL">CRITICAL</option>
+        <option value="HIGH">HIGH</option>
+        <option value="MEDIUM">MEDIUM</option>
+        <option value="LOW">LOW</option>
+      </select>
+      <select id="c-status">
+        <option value="OPEN">OPEN</option>
+        <option value="IN_PROGRESS">IN_PROGRESS</option>
+        <option value="CLOSED">CLOSED</option>
+        <option value="VERIFIED">VERIFIED</option>
+      </select>
+      <button class="btn secondary" onclick="loadCaps()">Apply</button>
+    </div>
+
+    <div class="section" style="padding:0;">
+      <table>
+        <thead><tr>
+          <th>CAP ID</th><th>Severity</th><th>Finding</th>
+          <th>Owner</th><th>Action Plan</th><th>Due</th>
+          <th>Framework</th><th>Status</th><th>Action</th>
+        </tr></thead>
+        <tbody id="c-tbody"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Report Tab                                    -->
+  <!-- ============================================ -->
+  <div class="tab-panel" id="tab-report">
+    <div class="section">
+      <h2>Latest Audit Summary</h2>
+      <div class="kv" id="r-summary"></div>
+    </div>
+    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:18px;">
+      <div class="section"><h3>Phase 1 · Detection</h3><div id="r-p1"></div></div>
+      <div class="section"><h3>Phase 2 · Lateral Movement</h3><div id="r-p2"></div></div>
+      <div class="section"><h3>Phase 3 · Extortion / Reg</h3><div id="r-p3"></div></div>
+      <div class="section"><h3>Phase 4 · Recovery</h3><div id="r-p4"></div></div>
+    </div>
+
+    <div class="section">
+      <h2>Open CAPs by Framework</h2>
+      <div id="r-cap-fw"></div>
+    </div>
+
+    <div class="section">
+      <h2>Systems Tier × Region Matrix</h2>
+      <table>
+        <thead><tr><th>Tier</th><th>Region</th><th>Count</th></tr></thead>
+        <tbody id="r-matrix"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Audit Tab                                     -->
+  <!-- ============================================ -->
+  <div class="tab-panel" id="tab-audit">
+    <div class="section" style="padding:0;">
+      <table>
+        <thead><tr>
+          <th>Time</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th>
+        </tr></thead>
+        <tbody id="au-tbody"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+$$('.tab').forEach(t => t.addEventListener('click', () => {
+  $$('.tab').forEach(x => x.classList.remove('active'));
+  $$('.tab-panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  const id = 'tab-' + t.dataset.tab;
+  $('#' + id).classList.add('active');
+  if (t.dataset.tab === 'bia') loadSystems();
+  if (t.dataset.tab === 'tabletop') loadTabletop();
+  if (t.dataset.tab === 'caps') loadCaps();
+  if (t.dataset.tab === 'report') loadReport();
+  if (t.dataset.tab === 'audit') loadAudit();
+}));
+
+function toast(msg, kind) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (kind || '');
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+async function api(method, path, body) {
+  const opt = { method, headers: {} };
+  if (body) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  const r = await fetch('/api' + path, opt);
+  if (!r.ok) { toast(r.status + ' ' + r.statusText, 'error'); throw new Error(r.statusText); }
+  return r.json();
+}
+
+// ============================================
+// Scorecard
+// ============================================
+async function loadDashboard() {
+  const d = await api('GET', '/dashboard/summary');
+  $('#card-systems').textContent = d.systems;
+  $('#card-t0').textContent = d.by_tier.TIER_0;
+  $('#card-caps').textContent = d.caps_open;
+  $('#card-caps-critical').textContent = d.caps_critical_open;
+  $('#card-loss').textContent = '$' + d.worst_case_24h_loss_usd.toLocaleString();
+
+  // Tier distribution
+  const tEl = $('#by-tier');
+  const tTotal = d.systems || 1;
+  tEl.innerHTML = ['TIER_0','TIER_1','TIER_2'].map(t => `
+    <div class="bar">
+      <span class="severity ${t === 'TIER_0' ? 'CRITICAL' : (t === 'TIER_1' ? 'HIGH' : 'LOW')}" style="width:90px;">${t}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${(d.by_tier[t]/tTotal)*100}%; background:var(--tier${t.split('_')[1].toLowerCase()});"></div></div>
+      <span style="width:60px; text-align:right;">${d.by_tier[t]} (${((d.by_tier[t]/tTotal)*100).toFixed(0)}%)</span>
+    </div>`).join('');
+
+  // BU distribution
+  const buEl = $('#by-unit');
+  if (d.by_unit.length === 0) buEl.innerHTML = '<div class="empty">无数据</div>';
+  else {
+    const maxU = Math.max(...d.by_unit.map(x => x.cnt));
+    buEl.innerHTML = d.by_unit.map(x => `
+      <div class="bar">
+        <span style="width:120px;">${x.business_unit}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${(x.cnt/maxU)*100}%;"></div></div>
+        <span style="width:30px; text-align:right;">${x.cnt}</span>
+      </div>`).join('');
+  }
+
+  // CAPs by severity
+  const capEl = $('#by-cap-sev');
+  if (d.by_cap_severity.length === 0) capEl.innerHTML = '<div class="empty">无 OPEN CAPs</div>';
+  else {
+    const maxC = Math.max(...d.by_cap_severity.map(x => x.cnt));
+    capEl.innerHTML = d.by_cap_severity.map(x => `
+      <div class="bar">
+        <span class="severity ${x.severity}" style="width:80px;">${x.severity}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${(x.cnt/maxC)*100}%; background:var(--${x.severity.toLowerCase()});"></div></div>
+        <span style="width:30px; text-align:right;">${x.cnt}</span>
+      </div>`).join('');
+  }
+
+  // Latest exercise
+  const e = d.latest_exercise;
+  const exEl = $('#ex-summary');
+  if (!e) exEl.innerHTML = '<div class="empty">尚未跑过演练</div>';
+  else {
+    exEl.innerHTML = `
+      <div class="k">Exercise ID</div><div class="v"><code>${e.exercise_id}</code></div>
+      <div class="k">Title</div><div class="v">${e.scenario_title}</div>
+      <div class="k">Status</div><div class="v">${e.status}</div>
+      <div class="k">Overall Score</div><div class="v"><strong style="font-size:18px; color:${e.overall_score >= 70 ? 'var(--green)' : (e.overall_score >= 50 ? 'var(--yellow)' : 'var(--red)')};">${e.overall_score} / 100</strong></div>
+      <div class="k">RTO Achieved</div><div class="v">${e.rto_actual_hours} h</div>
+      <div class="k">RPO Achieved</div><div class="v">${e.rpo_actual_hours} h</div>
+      <div class="k">Started</div><div class="v">${e.started_at}</div>
+      <div class="k">Finished</div><div class="v">${e.finished_at}</div>
+    `;
+  }
+}
+
+// ============================================
+// BIA Systems
+// ============================================
+let portfolioStats = null;
+async function loadSystems() {
+  const tier = $('#b-tier').value;
+  const unit = $('#b-unit').value;
+  const region = $('#b-region').value;
+  const qs = new URLSearchParams();
+  if (tier) qs.set('tier', tier);
+  if (unit) qs.set('business_unit', unit);
+  if (region) qs.set('region', region);
+  const d = await api('GET', '/bia/systems?' + qs);
+  const tbody = $('#b-tbody');
+  if (d.count === 0) { tbody.innerHTML = '<tr><td colspan="9" class="empty">无匹配 system</td></tr>'; }
+  else {
+    tbody.innerHTML = d.items.map(s => {
+      const flags = [];
+      if (s.contains_pci) flags.push('<span class="severity CRITICAL">PCI</span>');
+      if (s.contains_pii) flags.push('<span class="severity HIGH">PII</span>');
+      if (s.regulatory_fine_risk) flags.push('<span class="severity MEDIUM">REG</span>');
+      return `
+        <tr>
+          <td><code>${s.system_id}</code><br>${s.system_name}</td>
+          <td>${s.business_unit}</td>
+          <td><span class="tier-${s.tier}">${s.tier}</span></td>
+          <td>$${(s.hourly_loss_usd || 0).toLocaleString()}</td>
+          <td>${s.target_rto_hours}h / ${s.target_rpo_hours}h</td>
+          <td>${s.region}</td>
+          <td>${s.data_classification}</td>
+          <td style="font-size:11px;">${s.owner_email || '—'}</td>
+          <td>${flags.join(' ')}</td>
+        </tr>`;
+    }).join('');
+  }
+  // Portfolio stats
+  const p = await api('GET', '/bia/portfolio');
+  portfolioStats = p;
+  $('#b-portfolio').innerHTML = `
+    <div class="k">Total Systems</div><div class="v">${p.stats.total_systems}</div>
+    <div class="k">By Tier</div><div class="v">${p.stats.by_tier.TIER_0} T0 · ${p.stats.by_tier.TIER_1} T1 · ${p.stats.by_tier.TIER_2} T2</div>
+    <div class="k">Total Hourly Loss</div><div class="v">$${p.stats.total_hourly_loss_usd.toLocaleString()}/hr</div>
+    <div class="k">Worst-Case 24h Loss</div><div class="v"><strong style="color:var(--red);">$${p.stats.worst_case_24h_loss_usd.toLocaleString()}</strong></div>
+  `;
+}
+
+// ============================================
+// Tabletop
+// ============================================
+let cachedInjects = [];
+async function loadTabletop() {
+  if (cachedInjects.length === 0) {
+    const d = await api('GET', '/scenarios/injects');
+    cachedInjects = d.items;
+  }
+  const il = $('#inject-list');
+  il.innerHTML = cachedInjects.map(i => `
+    <div class="phase-card">
+      <div class="phase-title">${i.phase_title}</div>
+      <div class="phase-meta">
+        <strong>${i.timeline}</strong> · ${i.regulatory_considerations}
+      </div>
+      <div class="phase-desc">${i.scenario_description}</div>
+      <div style="margin-top:10px;">
+        <strong style="font-size:11px; color:var(--text-dim);">KEY STAKEHOLDERS:</strong>
+        ${i.key_stakeholders.map(s => `<span class="severity HIGH" style="margin-left:6px;">${s}</span>`).join('')}
+      </div>
+      <div style="margin-top:8px;">
+        <strong style="font-size:11px; color:var(--text-dim);">DISCUSSION QUESTIONS:</strong>
+        <ul style="margin:6px 0 0 20px; font-size:12px;">
+          ${i.discussion_questions.map(q => `<li>${q}</li>`).join('')}
+        </ul>
+      </div>
+      <div style="margin-top:8px;">
+        <strong style="font-size:11px; color:var(--text-dim);">FRAMEWORK REF:</strong>
+        <code style="font-size:11px; margin-left:6px;">${i.framework_ref}</code>
+      </div>
+    </div>`).join('');
+
+  // Scorecard
+  const ex = await api('GET', '/exercises?limit=1');
+  if (ex.count === 0) { $('#ex-scorecard').innerHTML = '<div class="empty">无 exercise</div>'; return; }
+  const sc = await api('GET', `/exercises/${ex.items[0].exercise_id}/scorecard`);
+  const phaseHtml = Object.keys(sc.by_phase).map(p => {
+    const v = sc.by_phase[p];
+    const klass = v >= 18 ? 'good' : (v >= 10 ? 'warn' : 'bad');
+    return `<div class="phase-card" style="padding:12px 14px; margin-bottom:6px;">
+      <span class="phase-score ${klass}">Phase ${p}: ${v}/25</span>
+      <span style="margin-left:10px; color:var(--text-dim);">— ${cachedInjects[p-1]?.phase_title || ''}</span>
+    </div>`;
+  }).join('');
+  $('#ex-scorecard').innerHTML = `
+    <div class="kv" style="margin-bottom:14px;">
+      <div class="k">Exercise ID</div><div class="v"><code>${sc.exercise.exercise_id}</code></div>
+      <div class="k">Title</div><div class="v">${sc.exercise.scenario_title}</div>
+      <div class="k">Overall Score</div><div class="v"><strong>${sc.exercise.overall_score} / 100</strong></div>
+      <div class="k">RTO Achieved</div><div class="v">${sc.exercise.rto_actual_hours} h</div>
+      <div class="k">RPO Achieved</div><div class="v">${sc.exercise.rpo_actual_hours} h</div>
+      <div class="k">Open CAPs</div><div class="v">${sc.caps_open} (${sc.caps_critical} CRITICAL)</div>
+    </div>
+    <h3 style="margin-bottom:10px;">Phase Scores (out of 25 per phase)</h3>
+    ${phaseHtml}
+  `;
+}
+
+// ============================================
+// CAPs
+// ============================================
+async function loadCaps() {
+  const sev = $('#c-sev').value;
+  const status = $('#c-status').value;
+  const qs = new URLSearchParams();
+  if (sev) qs.set('severity', sev);
+  qs.set('status', status);
+  const d = await api('GET', '/caps?' + qs);
+  const tbody = $('#c-tbody');
+  if (d.count === 0) { tbody.innerHTML = '<tr><td colspan="9" class="empty">无匹配 CAP</td></tr>'; return; }
+  tbody.innerHTML = d.items.map(c => {
+    const actions = c.status === 'OPEN' ? `
+      <button class="btn warning" onclick="capAction('${c.cap_id}','IN_PROGRESS')">Start</button>
+      <button class="btn success" onclick="capAction('${c.cap_id}','CLOSED')">Close</button>` : `
+      <button class="btn secondary" onclick="capAction('${c.cap_id}','${c.status === 'CLOSED' ? 'VERIFIED' : 'OPEN'}')">${c.status === 'CLOSED' ? 'Verify' : 'Reopen'}</button>`;
+    return `
+      <tr>
+        <td><code>${c.cap_id}</code></td>
+        <td><span class="severity ${c.severity}">${c.severity}</span></td>
+        <td style="max-width:300px;">${c.finding}</td>
+        <td>${c.owner}<br><span style="font-size:11px; color:var(--text-dim);">${c.owner_email || ''}</span></td>
+        <td style="max-width:300px;">${c.action_plan}</td>
+        <td>${c.due_date}</td>
+        <td style="font-size:11px;">${c.framework_ref || '—'}</td>
+        <td><span class="severity status-${c.status}">${c.status}</span></td>
+        <td>${actions}</td>
+      </tr>`;
+  }).join('');
+}
+
+async function capAction(cap_id, status) {
+  await api('PATCH', `/caps/${cap_id}?status=${status}&actor=dashboard-user`);
+  toast('CAP updated: ' + status, 'success');
+  loadCaps();
+  loadDashboard();
+}
+
+// ============================================
+// Report
+// ============================================
+async function loadReport() {
+  const r = await api('GET', '/report/bcp');
+  $('#r-summary').innerHTML = `
+    <div class="k">Report Date</div><div class="v">${r.report_date}</div>
+    <div class="k">Framework</div><div class="v">${r.framework}</div>
+    <div class="k">Latest Exercise</div><div class="v">${r.latest_exercise ? r.latest_exercise.exercise_id + ' (' + r.latest_exercise.scenario_title + ')' : 'none'}</div>
+    <div class="k">Latest Score</div><div class="v">${r.latest_exercise ? r.latest_exercise.overall_score + ' / 100' : '—'}</div>
+    <div class="k">Latest RTO Achieved</div><div class="v">${r.latest_exercise ? r.latest_exercise.rto_actual_hours + ' h' : '—'}</div>
+  `;
+  ['1','2','3','4'].forEach(p => {
+    const v = r.phase_scores[p] || 0;
+    const klass = v >= 18 ? 'good' : (v >= 10 ? 'warn' : 'bad');
+    $('#r-p' + p).innerHTML = `<div class="phase-score ${klass}" style="font-size:24px;">${v}/25</div>
+      <div style="margin-top:10px; font-size:12px; color:var(--text-dim);">${v >= 18 ? 'PASS' : (v >= 10 ? 'NEEDS IMPROVEMENT' : 'FAIL')}</div>`;
+  });
+  // CAP by framework
+  if (r.cap_by_framework.length === 0) {
+    $('#r-cap-fw').innerHTML = '<div class="empty">无 OPEN CAPs</div>';
+  } else {
+    $('#r-cap-fw').innerHTML = r.cap_by_framework.map(c => `
+      <div class="bar">
+        <span class="severity ${c.severity}" style="width:80px;">${c.severity}</span>
+        <span style="font-family:monospace; font-size:11px; width:200px;">${c.framework}</span>
+        <span style="width:30px; text-align:right;">${c.cnt}</span>
+      </div>`).join('');
+  }
+  // Matrix
+  $('#r-matrix').innerHTML = r.systems_matrix.map(m => `
+    <tr>
+      <td><span class="tier-${m.tier}">${m.tier}</span></td>
+      <td>${m.region}</td>
+      <td>${m.cnt}</td>
+    </tr>`).join('');
+}
+
+// ============================================
+// Audit
+// ============================================
+async function loadAudit() {
+  const d = await api('GET', '/audit?limit=100');
+  const tbody = $('#au-tbody');
+  if (d.count === 0) { tbody.innerHTML = '<tr><td colspan="5" class="empty">无 audit 记录</td></tr>'; return; }
+  tbody.innerHTML = d.items.map(a => `
+    <tr>
+      <td style="font-size:11px; color:var(--text-dim);">${a.occurred_at}</td>
+      <td><code>${a.actor}</code></td>
+      <td><span class="severity ${a.action === 'run_scan' ? 'CRITICAL' : 'LOW'}">${a.action}</span></td>
+      <td style="font-size:11px;">${a.entity_type}:${a.entity_id || ''}</td>
+      <td style="font-size:11px; color:var(--text-dim); word-break:break-all;">${a.details || ''}</td>
+    </tr>`).join('');
+}
+
+async function reseed() {
+  toast('Reseeding demo data…');
+  await api('POST', '/admin/seed?actor=dashboard-user');
+  toast('Reseed complete', 'success');
+  loadDashboard();
+}
+
+// Init
+loadDashboard();
+</script>
+</body>
+</html>
