@@ -42,7 +42,7 @@ WEB_PORT=5041 python main.py serve
 
 ## 📝 PRD 来源
 
-本项目基于 `/Users/jiangwenrui/Downloads/mass/Interview/Security_and_GRC_14_Projects_Plan/14_BCP_DR_Tabletop_Exercise_and_Resilience.md` 完整规划。
+本项目基于 `/Users/jiangwenrui/Downloads/mass/25-Interview/Security_and_GRC_14_Projects_Plan/14_BCP_DR_Tabletop_Exercise_and_Resilience.md` 完整规划。
 
 ## 📄 License
 
